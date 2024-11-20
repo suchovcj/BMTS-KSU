@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building Floor Plan</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .floor-select {
+            padding: 5px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .floor-plan {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-size: cover;
+        }
+        .ticket-count {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: red;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            transition: transform 0.3s ease;
+        }
+        .ticket-count.highlighted {
+            transform: scale(1.5);
+            box-shadow: 0 0 10px yellow;
+        }
+        .bathroom-table {
+            border-collapse: collapse;
+            width: 300px;
+        }
+        .bathroom-table th, .bathroom-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .bathroom-table th {
+            background-color: #f2f2f2;
+        }
+        .bathroom-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .bathroom-table tr:hover {
+            background-color: #f5f5f5;
+            cursor: pointer;
+        }
+        .bathroom-table tr.highlighted {
+            background-color: #fffacd;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 id="floorHeader">Floor 2</h1>
+        <select id="floorSelect" class="floor-select">
+            <option value="1">Floor 1</option>
+            <option value="2" selected>Floor 2</option>
+            <option value="3">Floor 3</option>
+            <option value="4">Floor 4</option>
+        </select>
+    </div>
+    <div class="container">
+        <div class="floor-plan" id="floorPlan">
+            <!-- Ticket count indicators will be added here dynamically -->
+        </div>
+        <table class="bathroom-table">
+            <thead>
+                <tr>
+                    <th>Bathroom Number</th>
+                    <th>Tickets</th>
+                </tr>
+            </thead>
+            <tbody id="bathroomList">
+                <!-- Bathroom list will be populated here -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Fake data for bathrooms and tickets for all floors
+        const allFloorsData = {
+            1: [
+                { number: "A101", tickets: 3, x: 100, y: 150 },
+                { number: "B102", tickets: 1, x: 300, y: 250 },
+                { number: "C103", tickets: 2, x: 500, y: 400 },
+            ],
+            2: [
+                { number: "A201", tickets: 5, x: 200, y: 300 },
+                { number: "B202", tickets: 0, x: 400, y: 200 },
+                { number: "C203", tickets: 4, x: 600, y: 350 },
+            ],
+            3: [
+                { number: "A301", tickets: 2, x: 150, y: 450 },
+                { number: "B302", tickets: 1, x: 350, y: 100 },
+                { number: "C303", tickets: 3, x: 550, y: 250 },
+            ],
+            4: [
+                { number: "A401", tickets: 6, x: 250, y: 200 },
+                { number: "B402", tickets: 2, x: 450, y: 300 },
+                { number: "C403", tickets: 1, x: 650, y: 150 },
+            ]
+        };
+
+        function addTicketCounters(floorData) {
+            const floorPlan = document.getElementById('floorPlan');
+            floorPlan.innerHTML = ''; // Clear existing counters
+            floorData.forEach(bathroom => {
+                const counter = document.createElement('div');
+                counter.className = 'ticket-count';
+                counter.style.left = `${bathroom.x}px`;
+                counter.style.top = `${bathroom.y}px`;
+                counter.textContent = bathroom.tickets;
+                counter.id = `counter-${bathroom.number}`;
+                floorPlan.appendChild(counter);
+            });
+        }
+
+        function populateBathroomTable(floorData) {
+            const bathroomList = document.getElementById('bathroomList');
+            bathroomList.innerHTML = ''; // Clear existing rows
+            floorData.forEach(bathroom => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${bathroom.number}</td>
+                    <td>${bathroom.tickets}</td>
+                `;
+                row.addEventListener('click', () => highlightBathroom(bathroom.number));
+                bathroomList.appendChild(row);
+            });
+        }
+
+        function highlightBathroom(bathroomNumber) {
+            // Remove previous highlights
+            document.querySelectorAll('.ticket-count').forEach(el => el.classList.remove('highlighted'));
+            document.querySelectorAll('.bathroom-table tr').forEach(el => el.classList.remove('highlighted'));
+
+            // Highlight the clicked bathroom
+            const counter = document.getElementById(`counter-${bathroomNumber}`);
+            const tableRow = Array.from(document.querySelectorAll('.bathroom-table tr')).find(row => row.cells[0].textContent === bathroomNumber);
+            
+            if (counter) counter.classList.add('highlighted');
+            if (tableRow) tableRow.classList.add('highlighted');
+        }
+
+        function updateFloor(floorNumber) {
+            const floorData = allFloorsData[floorNumber];
+            document.getElementById('floorHeader').textContent = `Floor ${floorNumber}`;
+            document.getElementById('floorPlan').style.backgroundImage = `url('../../images/floor${floorNumber}.png')`;
+            addTicketCounters(floorData);
+            populateBathroomTable(floorData);
+        }
+
+        // Initialize the page and set up floor selection
+        window.onload = function() {
+            const floorSelect = document.getElementById('floorSelect');
+            floorSelect.addEventListener('change', (e) => updateFloor(e.target.value));
+            updateFloor(2); // Start with Floor 2
+        };
+    </script>
+</body>
+</html>

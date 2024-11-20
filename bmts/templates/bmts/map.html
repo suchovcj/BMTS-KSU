@@ -1,0 +1,226 @@
+{% extends 'bmts/tickets_base.html' %}
+{% load static %}  <!-- Add this line -->
+{% block title %}Building Floor Plan{% endblock %}
+
+{% block content %}
+<style>
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        color: var(--primary-color);
+    }
+    
+    .floor-select {
+        padding: 8px;
+        border: 2px solid var(--primary-color);
+        border-radius: 5px;
+        color: var(--primary-color);
+        font-weight: bold;
+    }
+
+    .container {
+        display: flex;
+        gap: 20px;
+    }
+
+    .floor-plan {
+        position: relative;
+        width: 800px;
+        height: 600px;
+        background-size: cover;
+        background-color: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .ticket-count {
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        background-color: var(--primary-color);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: var(--secondary-color);
+        font-size: 12px;
+        font-weight: bold;
+        transition: transform 0.3s ease;
+        cursor: pointer;
+    }
+
+    .ticket-count.highlighted {
+        transform: scale(1.5);
+        box-shadow: 0 0 10px var(--secondary-color);
+        background-color: var(--secondary-color);
+        color: var(--primary-color);
+    }
+
+    .bathroom-table {
+        border-collapse: collapse;
+        width: 300px;
+        background-color: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .bathroom-table th {
+        background-color: var(--secondary-color);
+        color: var(--primary-color);
+        padding: 12px;
+        font-weight: bold;
+        text-align: left;
+    }
+
+    .bathroom-table td {
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .bathroom-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .bathroom-table tr:nth-child(even) {
+        background-color: #f8f9fa;
+    }
+
+    .bathroom-table tr:hover {
+        background-color: #f2f2f2;
+        cursor: pointer;
+    }
+
+    .bathroom-table tr.highlighted {
+        background-color: var(--secondary-color);
+        color: var(--primary-color);
+        font-weight: bold;
+    }
+
+    .floor-info-card {
+        background-color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+</style>
+
+<div class="floor-info-card">
+    <div class="header">
+        <h2 class="mb-0">
+            <i class="fas fa-building me-2"></i>
+            <span id="floorHeader">Floor 2</span>
+        </h2>
+        <select id="floorSelect" class="floor-select">
+            <option value="1">Floor 1</option>
+            <option value="2" selected>Floor 2</option>
+            <option value="3">Floor 3</option>
+            <option value="4">Floor 4</option>
+        </select>
+    </div>
+</div>
+
+<div class="container">
+    <div class="floor-plan" id="floorPlan">
+        <!-- Ticket count indicators will be added here dynamically -->
+    </div>
+    <table class="bathroom-table">
+        <thead>
+            <tr>
+                <th>Bathroom Number</th>
+                <th>Open Tickets</th>
+            </tr>
+        </thead>
+        <tbody id="bathroomList">
+            <!-- Bathroom list will be populated here -->
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // Fake data for bathrooms and tickets for all floors
+    const allFloorsData = {
+        1: [
+            { number: "A101", tickets: 3, x: 100, y: 150 },
+            { number: "B102", tickets: 1, x: 300, y: 250 },
+            { number: "C103", tickets: 2, x: 500, y: 400 },
+        ],
+        2: [
+            { number: "A201", tickets: 5, x: 200, y: 300 },
+            { number: "B202", tickets: 0, x: 400, y: 200 },
+            { number: "C203", tickets: 4, x: 600, y: 350 },
+        ],
+        3: [
+            { number: "A301", tickets: 2, x: 150, y: 450 },
+            { number: "B302", tickets: 1, x: 350, y: 100 },
+            { number: "C303", tickets: 3, x: 550, y: 250 },
+        ],
+        4: [
+            { number: "A401", tickets: 6, x: 250, y: 200 },
+            { number: "B402", tickets: 2, x: 450, y: 300 },
+            { number: "C403", tickets: 1, x: 650, y: 150 },
+        ]
+    };
+
+    function addTicketCounters(floorData) {
+        const floorPlan = document.getElementById('floorPlan');
+        floorPlan.innerHTML = '';
+        floorData.forEach(bathroom => {
+            const counter = document.createElement('div');
+            counter.className = 'ticket-count';
+            counter.style.left = `${bathroom.x}px`;
+            counter.style.top = `${bathroom.y}px`;
+            counter.textContent = bathroom.tickets;
+            counter.id = `counter-${bathroom.number}`;
+            if (bathroom.tickets > 0) {
+                counter.innerHTML += `<i class="fas fa-exclamation-circle"></i>`;
+            }
+            floorPlan.appendChild(counter);
+        });
+    }
+
+    function populateBathroomTable(floorData) {
+        const bathroomList = document.getElementById('bathroomList');
+        bathroomList.innerHTML = '';
+        floorData.forEach(bathroom => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><i class="fas fa-door-open me-2"></i>${bathroom.number}</td>
+                <td>${bathroom.tickets}</td>
+            `;
+            row.addEventListener('click', () => highlightBathroom(bathroom.number));
+            bathroomList.appendChild(row);
+        });
+    }
+
+    function highlightBathroom(bathroomNumber) {
+        document.querySelectorAll('.ticket-count').forEach(el => el.classList.remove('highlighted'));
+        document.querySelectorAll('.bathroom-table tr').forEach(el => el.classList.remove('highlighted'));
+
+        const counter = document.getElementById(`counter-${bathroomNumber}`);
+        const tableRow = Array.from(document.querySelectorAll('.bathroom-table tr')).find(row => 
+            row.cells[0].textContent.includes(bathroomNumber)
+        );
+        
+        if (counter) counter.classList.add('highlighted');
+        if (tableRow) tableRow.classList.add('highlighted');
+    }
+
+    function updateFloor(floorNumber) {
+    const floorData = allFloorsData[floorNumber];
+    document.getElementById('floorHeader').textContent = `Floor ${floorNumber}`;
+    document.getElementById('floorPlan').style.backgroundImage = `url('{% static "bmts/images/floor" %}${floorNumber}.png')`;
+    addTicketCounters(floorData);
+    populateBathroomTable(floorData);
+}
+
+    window.onload = function() {
+        const floorSelect = document.getElementById('floorSelect');
+        floorSelect.addEventListener('change', (e) => updateFloor(e.target.value));
+        updateFloor(2);
+    };
+</script>
+{% endblock %}
