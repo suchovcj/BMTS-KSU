@@ -61,6 +61,18 @@
     .delete-btn:hover {
         background-color: #bd2130;
     }
+    .form-select, .form-control {
+        border-color: var(--primary-color);
+    }
+    
+    .form-select:focus, .form-control:focus {
+        border-color: var(--secondary-color);
+        box-shadow: 0 0 0 0.2rem rgba(255, 204, 0, 0.25);
+    }
+
+    .input-group .btn {
+        border: 1px solid var(--primary-color);
+    }
 </style>
 
 <div class="staff-container">
@@ -72,6 +84,66 @@
             <i class="fas fa-user-plus me-2"></i>Add Staff Member
         </button>
     </div>
+
+    <!-- Search and Filters -->
+<div class="staff-container mb-4">
+    <form method="get" class="row g-3">
+        <!-- Search -->
+        <div class="col-md-4">
+            <div class="input-group">
+                <input type="text" name="search" class="form-control" placeholder="Search staff..." 
+                       value="{{ search_query }}">
+                <button class="btn action-btn" type="submit">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Role Filter -->
+        <div class="col-md-2">
+            <select name="role" class="form-select" onchange="this.form.submit()">
+                <option value="all" {% if role_filter == 'all' %}selected{% endif %}>All Roles</option>
+                <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Admin</option>
+                <option value="staff" {% if role_filter == 'staff' %}selected{% endif %}>Staff</option>
+            </select>
+        </div>
+
+        <!-- Status Filter -->
+        <div class="col-md-2">
+            <select name="status" class="form-select" onchange="this.form.submit()">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Status</option>
+                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+            </select>
+        </div>
+
+        <!-- Sort -->
+        <div class="col-md-3">
+            <div class="input-group">
+                <select name="sort" class="form-select">
+                    <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Sort by Name</option>
+                    <option value="email" {% if sort_by == 'email' %}selected{% endif %}>Sort by Email</option>
+                    <option value="role" {% if sort_by == 'role' %}selected{% endif %}>Sort by Role</option>
+                    <option value="date_joined" {% if sort_by == 'date_joined' %}selected{% endif %}>Sort by Date Joined</option>
+                </select>
+                <select name="direction" class="form-select">
+                    <option value="asc" {% if sort_direction == 'asc' %}selected{% endif %}>Ascending</option>
+                    <option value="desc" {% if sort_direction == 'desc' %}selected{% endif %}>Descending</option>
+                </select>
+                <button class="btn action-btn" type="submit">
+                    <i class="fas fa-sort"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Reset Filters -->
+        <div class="col-md-1">
+            <a href="{% url 'bmts:staff' %}" class="btn btn-secondary w-100">
+                <i class="fas fa-undo"></i>
+            </a>
+        </div>
+    </form>
+</div>
 
     <table class="staff-table">
         <thead>
@@ -271,6 +343,16 @@
         var modals = document.querySelectorAll('.modal');
         modals.forEach(function(modal) {
             new bootstrap.Modal(modal);
+        });
+    });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auto-submit form when sort or filter changes
+        document.querySelectorAll('select[name="role"], select[name="status"]').forEach(select => {
+            select.addEventListener('change', function() {
+                this.form.submit();
+            });
         });
     });
 </script>

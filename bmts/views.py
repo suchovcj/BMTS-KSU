@@ -14,8 +14,59 @@ Staff = get_user_model()  # This gets your custom Staff model
 
 @login_required
 def staff_list(request):
-    staff_members = Staff.objects.filter(is_staff=True).order_by('date_joined')
-    return render(request, 'bmts/staff.html', {'staff_members': staff_members})
+    # Get all staff members
+    staff_members = Staff.objects.filter(is_staff=True)
+
+    # Get search query
+    search_query = request.GET.get('search', '')
+    if search_query:
+        staff_members = staff_members.filter(
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query) |
+            Q(email__icontains=search_query)
+        )
+
+    # Get role filter
+    role_filter = request.GET.get('role', 'all')
+    if role_filter == 'admin':
+        staff_members = staff_members.filter(is_superuser=True)
+    elif role_filter == 'staff':
+        staff_members = staff_members.filter(is_superuser=False)
+
+    # Get status filter
+    status_filter = request.GET.get('status', 'all')
+    if status_filter == 'active':
+        staff_members = staff_members.filter(is_active=True)
+    elif status_filter == 'inactive':
+        staff_members = staff_members.filter(is_active=False)
+
+    # Get sorting parameter
+    sort_by = request.GET.get('sort', 'date_joined')
+    sort_direction = request.GET.get('direction', 'asc')
+    
+    if sort_by == 'name':
+        sort_field = 'first_name'
+    elif sort_by == 'email':
+        sort_field = 'email'
+    elif sort_by == 'role':
+        sort_field = 'is_superuser'
+    else:
+        sort_field = 'date_joined'
+
+    if sort_direction == 'desc':
+        sort_field = f'-{sort_field}'
+    
+    staff_members = staff_members.order_by(sort_field)
+
+    context = {
+        'staff_members': staff_members,
+        'search_query': search_query,
+        'role_filter': role_filter,
+        'status_filter': status_filter,
+        'sort_by': sort_by,
+        'sort_direction': sort_direction
+    }
+    return render(request, 'bmts/staff.html', context)
 
 @login_required
 def add_staff(request):
