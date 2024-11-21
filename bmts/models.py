@@ -64,3 +64,4 @@ class MaintenanceTicket(models.Model):
 
     def __str__(self):
         return f"Ticket {self.ticket_number} - {self.bathroom_number}"
+

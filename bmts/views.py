@@ -1,13 +1,101 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from .forms import StaffLoginForm
 from .forms import MaintenanceTicketForm
 from django.contrib import messages
-from .models import MaintenanceTicket
+from .models import MaintenanceTicket, Staff
 from django.db.models import Q
 from django.utils import timezone
+from django.contrib.auth import get_user_model  # Add this line
+from django.http import JsonResponse
 
+Staff = get_user_model()  # This gets your custom Staff model
+
+@login_required
+def staff_list(request):
+    staff_members = Staff.objects.filter(is_staff=True).order_by('date_joined')
+    return render(request, 'bmts/staff.html', {'staff_members': staff_members})
+
+@login_required
+def add_staff(request):
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        role = request.POST.get('role')
+
+        try:
+            # Check if email already exists
+            if Staff.objects.filter(email=email).exists():
+                messages.error(request, 'Email already exists.')
+                return redirect('bmts:staff')
+
+            staff = Staff.objects.create(
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                is_staff=True
+            )
+            staff.set_password(password)
+            
+            if role == 'admin':
+                staff.is_superuser = True
+            
+            staff.save()
+            messages.success(request, 'Staff member added successfully.')
+        except Exception as e:
+            messages.error(request, f'Error adding staff member: {str(e)}')
+        
+        return redirect('bmts:staff')
+    
+    return redirect('bmts:staff')
+
+@login_required
+def edit_staff(request, staff_id):
+    if request.method == 'POST':
+        staff = get_object_or_404(Staff, id=staff_id)
+        
+        staff.first_name = request.POST.get('first_name')
+        staff.last_name = request.POST.get('last_name')
+        staff.email = request.POST.get('email')
+        
+        role = request.POST.get('role')
+        if role == 'admin':
+            staff.is_superuser = True
+            staff.is_staff = True
+        elif role == 'staff':
+            staff.is_superuser = False
+            staff.is_staff = True
+        else:
+            staff.is_superuser = False
+            staff.is_staff = False
+
+        # Only update password if a new one is provided
+        new_password = request.POST.get('password')
+        if new_password:
+            staff.set_password(new_password)
+
+        try:
+            staff.save()
+            messages.success(request, 'Staff member updated successfully.')
+        except Exception as e:
+            messages.error(request, f'Error updating staff member: {str(e)}')
+
+        return redirect('bmts:staff')
+
+@login_required
+def delete_staff(request, staff_id):
+    if request.method == 'POST':
+        staff = get_object_or_404(Staff, id=staff_id)
+        try:
+            staff.delete()
+            messages.success(request, 'Staff member deleted successfully.')
+        except Exception as e:
+            messages.error(request, f'Error deleting staff member: {str(e)}')
+        return JsonResponse({'status': 'success'})
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
 
 @login_required
 def index(request):
