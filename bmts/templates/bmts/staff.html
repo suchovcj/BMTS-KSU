@@ -161,7 +161,6 @@
                     <div class="mb-3">
                         <label class="form-label">Role</label>
                         <select name="role" class="form-select">
-                            <option value="user">User</option>
                             <option value="staff">Staff</option>
                             <option value="admin">Admin</option>
                         </select>
@@ -176,7 +175,6 @@
     </div>
 </div>
 
-<!-- Add this modal after your add staff modal -->
 <!-- Edit Staff Modal -->
 <div class="modal fade" id="editStaffModal" tabindex="-1">
     <div class="modal-dialog">
@@ -209,7 +207,6 @@
                     <div class="mb-3">
                         <label class="form-label">Role</label>
                         <select name="role" id="edit_role" class="form-select">
-                            <option value="user">User</option>
                             <option value="staff">Staff</option>
                             <option value="admin">Admin</option>
                         </select>
@@ -224,14 +221,17 @@
     </div>
 </div>
 
-<!-- Update the JavaScript section -->
+<!-- Bootstrap-->
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js"></script>
+<!-- Updated JavaScript -->
 <script>
     function editStaff(staffId, firstName, lastName, email, role) {
         const editModal = new bootstrap.Modal(document.getElementById('editStaffModal'));
         const form = document.getElementById('editStaffForm');
         
         // Set form action
-        form.action = `/staff/edit/${staffId}/`;
+        form.action = `{% url 'bmts:staff' %}edit/${staffId}/`;
         
         // Populate form fields
         document.getElementById('edit_first_name').value = firstName;
@@ -244,7 +244,7 @@
 
     function deleteStaff(staffId) {
         if (confirm('Are you sure you want to delete this staff member?')) {
-            fetch(`/staff/delete/${staffId}/`, {
+            fetch(`{% url 'bmts:staff' %}delete/${staffId}/`, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
@@ -264,5 +264,14 @@
             });
         }
     }
+
+    // Make sure Bootstrap is properly loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize all modals
+        var modals = document.querySelectorAll('.modal');
+        modals.forEach(function(modal) {
+            new bootstrap.Modal(modal);
+        });
+    });
 </script>
 {% endblock %}

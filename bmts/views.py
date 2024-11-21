@@ -65,12 +65,9 @@ def edit_staff(request, staff_id):
         if role == 'admin':
             staff.is_superuser = True
             staff.is_staff = True
-        elif role == 'staff':
-            staff.is_superuser = False
-            staff.is_staff = True
         else:
             staff.is_superuser = False
-            staff.is_staff = False
+            staff.is_staff = True
 
         # Only update password if a new one is provided
         new_password = request.POST.get('password')
@@ -84,6 +81,8 @@ def edit_staff(request, staff_id):
             messages.error(request, f'Error updating staff member: {str(e)}')
 
         return redirect('bmts:staff')
+    
+    return redirect('bmts:staff')
 
 @login_required
 def delete_staff(request, staff_id):
