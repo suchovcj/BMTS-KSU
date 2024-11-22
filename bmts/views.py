@@ -153,10 +153,11 @@ def delete_staff(request, staff_id):
 
 @login_required
 def index(request):
-    # Get current date range
+    # Get date ranges
     today = timezone.now().date()
     today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
     today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+    past_30_days = today - timedelta(days=30)  # Moved this up
 
     # Active staff count
     active_staff_count = Staff.objects.filter(
@@ -165,10 +166,8 @@ def index(request):
         is_active=True
     ).count()
 
-    # Get open tickets count
+    # Get pending tickets count and calculate average resolution time
     pending_tickets_count = MaintenanceTicket.objects.filter(status='Open').count()
-
-    # Calculate average resolution time for pending tickets
     closed_tickets = MaintenanceTicket.objects.filter(
         status='Closed',
         date_closed__isnull=False,
@@ -178,15 +177,12 @@ def index(request):
     if closed_tickets.exists():
         total_resolution_time = timedelta()
         ticket_count = 0
-        
         for ticket in closed_tickets:
             resolution_time = ticket.date_closed - ticket.date_submitted
             total_resolution_time += resolution_time
             ticket_count += 1
 
         avg_resolution_time = total_resolution_time / ticket_count
-        
-        # Format time display
         total_minutes = int(avg_resolution_time.total_seconds() // 60)
         days = total_minutes // (24 * 60)
         hours = (total_minutes % (24 * 60)) // 60
@@ -204,42 +200,50 @@ def index(request):
     else:
         avg_time_display = "No completed tickets"
 
-    # Get today's closed tickets
-    today_closed_count = MaintenanceTicket.objects.filter(
-        status='Closed',
-        date_closed__range=(today_start, today_end)
+    # Count tickets submitted today
+    today_submitted_count = MaintenanceTicket.objects.filter(
+        date_submitted__date=today
     ).count()
 
-    # Calculate daily average of closed tickets (past 30 days)
-    past_30_days = today - timedelta(days=30)
+    # Calculate submitted tickets average
+    submitted_tickets_by_day = MaintenanceTicket.objects.filter(
+        date_submitted__gte=past_30_days
+    ).dates('date_submitted', 'day')
+    
+    total_submitted_days = len(set(submitted_tickets_by_day))
+    total_submitted = MaintenanceTicket.objects.filter(
+        date_submitted__gte=past_30_days
+    ).count()
+
+    if total_submitted_days > 0:
+        daily_submitted_avg = total_submitted / total_submitted_days
+        daily_submitted_avg_display = f"{daily_submitted_avg:.1f}"
+    else:
+        daily_submitted_avg_display = "0"
+
+    # Count tickets closed today
+    today_closed_count = MaintenanceTicket.objects.filter(
+        status='Closed',
+        date_closed__date=today
+    ).count()
+
+    # Calculate closed tickets average
+    closed_tickets_by_day = MaintenanceTicket.objects.filter(
+        status='Closed',
+        date_closed__gte=past_30_days
+    ).dates('date_closed', 'day')
+    
+    total_closed_days = len(set(closed_tickets_by_day))
     total_closed = MaintenanceTicket.objects.filter(
         status='Closed',
         date_closed__gte=past_30_days
     ).count()
-    
-    # Calculate daily average
-    if total_closed > 0:
-        daily_average = total_closed / 30
-        daily_avg_display = f"{daily_average:.1f}"
+
+    if total_closed_days > 0:
+        daily_closed_avg = total_closed / total_closed_days
+        daily_avg_display = f"{daily_closed_avg:.1f}"
     else:
         daily_avg_display = "0"
-    
-    # Get today's submitted tickets
-    today_submitted_count = MaintenanceTicket.objects.filter(
-        date_submitted__range=(today_start, today_end)
-    ).count()
-
-    # Calculate daily average of submitted tickets (past 30 days)
-    total_submitted = MaintenanceTicket.objects.filter(
-        date_submitted__gte=past_30_days
-    ).count()
-    
-    # Calculate daily average of submissions
-    if total_submitted > 0:
-        daily_submitted_avg = total_submitted / 30
-        daily_submitted_avg_display = f"{daily_submitted_avg:.1f}"
-    else:
-        daily_submitted_avg_display = "0" 
 
     # Get recent tickets
     recent_tickets = MaintenanceTicket.objects.all().order_by('-date_submitted')[:3]
@@ -249,10 +253,10 @@ def index(request):
         'pending_tickets_count': pending_tickets_count,
         'avg_time_display': avg_time_display,
         'recent_tickets': recent_tickets,
-        'today_closed_count': today_closed_count,
-        'daily_avg_display': daily_avg_display,
         'today_submitted_count': today_submitted_count,
         'daily_submitted_avg_display': daily_submitted_avg_display,
+        'today_closed_count': today_closed_count,
+        'daily_avg_display': daily_avg_display,
     }
     return render(request, 'bmts/index.html', context)
 
