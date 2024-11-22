@@ -138,16 +138,19 @@
             <div class="col-md-3">
                 <div class="card stat-card">
                     <div class="card-header">
-                        <i class="fas fa-check-circle me-2"></i>Resolved Tickets
+                        <i class="fas fa-check-circle me-2"></i>Resolved Tickets (Today)
                     </div>
                     <div class="card-body">
-                        <h2 class="card-title">789</h2>
-                        <p class="card-text text-success"><i class="fas fa-trophy"></i> Goal Reached</p>
+                        <h2 class="card-title">{{ today_closed_count }}</h2>
+                        <small class="text-muted d-block">
+                            <i class="fas fa-calculator me-1"></i>
+                            Daily Avg: {{ daily_avg_display }} tickets
+                        </small>
                     </div>
                 </div>
             </div>
-        </div>
-
+        </div>  <!-- Added closing div for the stat cards row -->
+    
         <!-- Main Content Area -->
         <div class="row">
             <!-- Left Sidebar -->

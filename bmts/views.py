@@ -9,7 +9,7 @@ from django.db.models import Q, Count
 from django.utils import timezone
 from django.contrib.auth import get_user_model  # Add this line
 from django.http import JsonResponse
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django.contrib.sessions.models import Session
 from django.utils import timezone
 
@@ -153,48 +153,41 @@ def delete_staff(request, staff_id):
 
 @login_required
 def index(request):
-    # Existing staff code
+    # Get current date range
+    today = timezone.now().date()
+    today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+
+    # Active staff count
     active_staff_count = Staff.objects.filter(
         id__in=[request.user.id],
         is_staff=True,
         is_active=True
     ).count()
 
-    # Get open tickets and calculate stats
-    open_tickets = MaintenanceTicket.objects.filter(status='Open')
-    pending_tickets_count = open_tickets.count()
+    # Get open tickets count
+    pending_tickets_count = MaintenanceTicket.objects.filter(status='Open').count()
 
-    # Get all closed tickets
+    # Calculate average resolution time for pending tickets
     closed_tickets = MaintenanceTicket.objects.filter(
         status='Closed',
-        date_closed__isnull=False
+        date_closed__isnull=False,
+        date_submitted__isnull=False
     )
 
-    # Calculate combined average time
-    total_time = timedelta()
-    total_tickets = 0
-    now = timezone.now()
-
-    # Add times from closed tickets
     if closed_tickets.exists():
+        total_resolution_time = timedelta()
+        ticket_count = 0
+        
         for ticket in closed_tickets:
             resolution_time = ticket.date_closed - ticket.date_submitted
-            total_time += resolution_time
-            total_tickets += 1
+            total_resolution_time += resolution_time
+            ticket_count += 1
 
-    # Add current pending times from open tickets
-    if open_tickets.exists():
-        for ticket in open_tickets:
-            pending_time = now - ticket.date_submitted
-            total_time += pending_time
-            total_tickets += 1
-
-    # Calculate average if there are any tickets
-    if total_tickets > 0:
-        avg_pending_time = total_time / total_tickets
-
-        # Format average time for display with days, hours, and minutes
-        total_minutes = int(avg_pending_time.total_seconds() // 60)
+        avg_resolution_time = total_resolution_time / ticket_count
+        
+        # Format time display
+        total_minutes = int(avg_resolution_time.total_seconds() // 60)
         days = total_minutes // (24 * 60)
         hours = (total_minutes % (24 * 60)) // 60
         minutes = total_minutes % 60
@@ -209,7 +202,27 @@ def index(request):
             
         avg_time_display = ", ".join(time_parts)
     else:
-        avg_time_display = "No data yet"
+        avg_time_display = "No completed tickets"
+
+    # Get today's closed tickets
+    today_closed_count = MaintenanceTicket.objects.filter(
+        status='Closed',
+        date_closed__range=(today_start, today_end)
+    ).count()
+
+    # Calculate daily average of closed tickets (past 30 days)
+    past_30_days = today - timedelta(days=30)
+    total_closed = MaintenanceTicket.objects.filter(
+        status='Closed',
+        date_closed__gte=past_30_days
+    ).count()
+    
+    # Calculate daily average
+    if total_closed > 0:
+        daily_average = total_closed / 30
+        daily_avg_display = f"{daily_average:.1f}"
+    else:
+        daily_avg_display = "0"
 
     # Get recent tickets
     recent_tickets = MaintenanceTicket.objects.all().order_by('-date_submitted')[:3]
@@ -219,61 +232,10 @@ def index(request):
         'pending_tickets_count': pending_tickets_count,
         'avg_time_display': avg_time_display,
         'recent_tickets': recent_tickets,
+        'today_closed_count': today_closed_count,
+        'daily_avg_display': daily_avg_display,
     }
     return render(request, 'bmts/index.html', context)
-
-@login_required
-def open_tickets(request):
-    if request.method == 'POST':
-        ticket_ids = request.POST.getlist('ticket_ids')
-        if ticket_ids:
-            # Update tickets with current timestamp when closing
-            MaintenanceTicket.objects.filter(id__in=ticket_ids).update(
-                status='Closed',
-                date_closed=timezone.now()
-            )
-            messages.success(request, f'{len(ticket_ids)} ticket(s) marked as closed.')
-        return redirect('bmts:open_tickets')
-
-    # Get filter parameters
-    search_query = request.GET.get('search', '')
-    sort_by = request.GET.get('sort', '-date_submitted')
-    date_filter = request.GET.get('date_filter', 'all')
-
-    # Base queryset
-    tickets = MaintenanceTicket.objects.filter(status='Open')
-
-    # Apply search filter
-    if search_query:
-        tickets = tickets.filter(
-            Q(ticket_number__icontains=search_query) |
-            Q(bathroom_number__icontains=search_query) |
-            Q(email__icontains=search_query) |
-            Q(description__icontains=search_query)
-        )
-
-    # Apply date filter
-    from datetime import datetime, timedelta
-    today = datetime.now().date()
-    if date_filter == 'today':
-        tickets = tickets.filter(date_submitted__date=today)
-    elif date_filter == 'week':
-        week_ago = today - timedelta(days=7)
-        tickets = tickets.filter(date_submitted__date__gte=week_ago)
-    elif date_filter == 'month':
-        month_ago = today - timedelta(days=30)
-        tickets = tickets.filter(date_submitted__date__gte=month_ago)
-
-    # Apply sorting
-    tickets = tickets.order_by(sort_by)
-
-    context = {
-        'tickets': tickets,
-        'search_query': search_query,
-        'sort_by': sort_by,
-        'date_filter': date_filter,
-    }
-    return render(request, 'bmts/open_tickets.html', context)
 
 @login_required
 def closed_tickets(request):
@@ -355,3 +317,9 @@ def create_ticket(request):
         form = MaintenanceTicketForm()
     
     return render(request, 'bmts/create_ticket.html', {'form': form})
+
+@login_required
+def open_tickets(request):
+    # Get all open tickets
+    open_tickets = MaintenanceTicket.objects.filter(status='Open').order_by('-date_submitted')
+    return render(request, 'bmts/open_tickets.html', {'tickets': open_tickets})
