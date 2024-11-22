@@ -5,10 +5,13 @@ from .forms import StaffLoginForm
 from .forms import MaintenanceTicketForm
 from django.contrib import messages
 from .models import MaintenanceTicket, Staff
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.utils import timezone
 from django.contrib.auth import get_user_model  # Add this line
 from django.http import JsonResponse
+from datetime import timedelta
+from django.contrib.sessions.models import Session
+from django.utils import timezone
 
 Staff = get_user_model()  # This gets your custom Staff model
 
@@ -147,14 +150,75 @@ def delete_staff(request, staff_id):
         return JsonResponse({'status': 'success'})
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
 
+
 @login_required
 def index(request):
-    # Get 3 most recent tickets
+    # Existing staff code
+    active_staff_count = Staff.objects.filter(
+        id__in=[request.user.id],
+        is_staff=True,
+        is_active=True
+    ).count()
+
+    # Get open tickets and calculate stats
+    open_tickets = MaintenanceTicket.objects.filter(status='Open')
+    pending_tickets_count = open_tickets.count()
+
+    # Get all closed tickets
+    closed_tickets = MaintenanceTicket.objects.filter(
+        status='Closed',
+        date_closed__isnull=False
+    )
+
+    # Calculate combined average time
+    total_time = timedelta()
+    total_tickets = 0
+    now = timezone.now()
+
+    # Add times from closed tickets
+    if closed_tickets.exists():
+        for ticket in closed_tickets:
+            resolution_time = ticket.date_closed - ticket.date_submitted
+            total_time += resolution_time
+            total_tickets += 1
+
+    # Add current pending times from open tickets
+    if open_tickets.exists():
+        for ticket in open_tickets:
+            pending_time = now - ticket.date_submitted
+            total_time += pending_time
+            total_tickets += 1
+
+    # Calculate average if there are any tickets
+    if total_tickets > 0:
+        avg_pending_time = total_time / total_tickets
+
+        # Format average time for display with days, hours, and minutes
+        total_minutes = int(avg_pending_time.total_seconds() // 60)
+        days = total_minutes // (24 * 60)
+        hours = (total_minutes % (24 * 60)) // 60
+        minutes = total_minutes % 60
+
+        time_parts = []
+        if days > 0:
+            time_parts.append(f"{days} day{'s' if days != 1 else ''}")
+        if hours > 0:
+            time_parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+        if minutes > 0 or not time_parts:
+            time_parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+            
+        avg_time_display = ", ".join(time_parts)
+    else:
+        avg_time_display = "No data yet"
+
+    # Get recent tickets
     recent_tickets = MaintenanceTicket.objects.all().order_by('-date_submitted')[:3]
-    
+
     context = {
+        'active_staff_count': active_staff_count,
+        'pending_tickets_count': pending_tickets_count,
+        'avg_time_display': avg_time_display,
         'recent_tickets': recent_tickets,
-        # ... other context items ...
     }
     return render(request, 'bmts/index.html', context)
 

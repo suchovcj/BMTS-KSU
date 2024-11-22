@@ -1,3 +1,5 @@
+{% load custom_filters %}
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -59,6 +61,18 @@
             padding: 20px;
             box-shadow: 0 0 15px rgba(0,0,0,0.1);
         }
+        .stat-card .card-body {
+            padding: 1rem;
+        }
+
+        .stat-card .quick-action {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .stat-card small {
+            font-size: 0.85rem;
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -89,8 +103,10 @@
                         <i class="fas fa-users me-2"></i>Staff on Duty
                     </div>
                     <div class="card-body">
-                        <h2 class="card-title">1,234</h2>
-                        <p class="card-text text-success"><i class="fas fa-arrow-up"></i> 12% increase</p>
+                        <h2 class="card-title">{{ active_staff_count }}</h2>
+                        <p class="card-text text-success">
+                            <i class="fas fa-circle me-1"></i>Currently logged in
+                        </p>
                     </div>
                 </div>
             </div>
@@ -100,8 +116,11 @@
                         <i class="fas fa-tasks me-2"></i>Pending Tickets
                     </div>
                     <div class="card-body">
-                        <h2 class="card-title">42</h2>
-                        <p class="card-text text-primary"><i class="fas fa-circle"></i> On Track</p>
+                        <h2 class="card-title">{{ pending_tickets_count }}</h2>
+                        <small class="text-muted d-block">
+                            <i class="fas fa-hourglass-half me-1"></i>
+                            Avg Resolution Time: {{ avg_time_display }}
+                        </small>
                     </div>
                 </div>
             </div>
