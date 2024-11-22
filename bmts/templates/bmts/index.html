@@ -127,11 +127,14 @@
             <div class="col-md-3">
                 <div class="card stat-card">
                     <div class="card-header">
-                        <i class="fas fa-clock me-2"></i>Pending Tasks
+                        <i class="fas fa-clock me-2"></i>Submitted Tickets (Today)
                     </div>
                     <div class="card-body">
-                        <h2 class="card-title">156</h2>
-                        <p class="card-text text-warning"><i class="fas fa-exclamation-circle"></i> Needs Review</p>
+                        <h2 class="card-title">{{ today_submitted_count }}</h2>
+                        <small class="text-muted d-block">
+                            <i class="fas fa-calculator me-1"></i>
+                            Daily Avg: {{ daily_submitted_avg_display }} tickets
+                        </small>
                     </div>
                 </div>
             </div>

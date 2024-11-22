@@ -223,6 +223,23 @@ def index(request):
         daily_avg_display = f"{daily_average:.1f}"
     else:
         daily_avg_display = "0"
+    
+    # Get today's submitted tickets
+    today_submitted_count = MaintenanceTicket.objects.filter(
+        date_submitted__range=(today_start, today_end)
+    ).count()
+
+    # Calculate daily average of submitted tickets (past 30 days)
+    total_submitted = MaintenanceTicket.objects.filter(
+        date_submitted__gte=past_30_days
+    ).count()
+    
+    # Calculate daily average of submissions
+    if total_submitted > 0:
+        daily_submitted_avg = total_submitted / 30
+        daily_submitted_avg_display = f"{daily_submitted_avg:.1f}"
+    else:
+        daily_submitted_avg_display = "0" 
 
     # Get recent tickets
     recent_tickets = MaintenanceTicket.objects.all().order_by('-date_submitted')[:3]
@@ -234,6 +251,8 @@ def index(request):
         'recent_tickets': recent_tickets,
         'today_closed_count': today_closed_count,
         'daily_avg_display': daily_avg_display,
+        'today_submitted_count': today_submitted_count,
+        'daily_submitted_avg_display': daily_submitted_avg_display,
     }
     return render(request, 'bmts/index.html', context)
 
@@ -320,6 +339,15 @@ def create_ticket(request):
 
 @login_required
 def open_tickets(request):
-    # Get all open tickets
-    open_tickets = MaintenanceTicket.objects.filter(status='Open').order_by('-date_submitted')
-    return render(request, 'bmts/open_tickets.html', {'tickets': open_tickets})
+    if request.method == 'POST':
+        ticket_ids = request.POST.getlist('ticket_ids')
+        if ticket_ids:
+            MaintenanceTicket.objects.filter(id__in=ticket_ids).update(
+                status='Closed',
+                date_closed=timezone.now()
+            )
+            messages.success(request, f'{len(ticket_ids)} ticket(s) marked as closed.')
+        return redirect('bmts:open_tickets')
+
+    tickets = MaintenanceTicket.objects.filter(status='Open').order_by('-date_submitted')
+    return render(request, 'bmts/open_tickets.html', {'tickets': tickets})
