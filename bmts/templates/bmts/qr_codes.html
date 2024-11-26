@@ -1,1 +1,202 @@
 {% extends 'bmts/tickets_base.html' %}
+{% load static %}
+
+{% block title %}BMTS - QR Code Management{% endblock %}
+
+{% block content %}
+<style>
+    .qr-card {
+        background-color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .qr-preview {
+        max-width: 150px;
+        margin: 10px 0;
+    }
+
+    .preview-card {
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    #preview-qr {
+        min-height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #preview-content {
+        padding: 20px;
+    }
+
+    .text-primary {
+        color: var(--primary-color) !important;
+    }
+
+    .bg-light {
+        background-color: #f8f9fa !important;
+    }
+</style>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-qrcode me-2"></i>QR Code Management</h2>
+        <button class="btn action-btn" data-bs-toggle="modal" data-bs-target="#generateQRModal">
+            <i class="fas fa-plus me-2"></i>Generate New QR Code
+        </button>
+    </div>
+
+    <!-- QR Codes List -->
+    <form method="post" action="{% url 'bmts:print_qr_codes' %}">
+        {% csrf_token %}
+        <div class="qr-card mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4>Generated QR Codes</h4>
+                <button type="submit" class="btn action-btn">
+                    <i class="fas fa-print me-2"></i>Print Selected
+                </button>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="select-all"></th>
+                            <th>Bathroom</th>
+                            <th>Preview</th>
+                            <th>Title</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for qr in qr_codes %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" name="selected_codes" value="{{ qr.id }}">
+                            </td>
+                            <td>{{ qr.bathroom.building.name }} - {{ qr.bathroom.bathroom_number }}</td>
+                            <td><img src="{{ qr.qr_code.url }}" class="qr-preview"></td>
+                            <td>{{ qr.title }}</td>
+                            <td>{{ qr.created_at|date:"M d, Y" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center">No QR codes generated yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Generate QR Modal -->
+<div class="modal fade" id="generateQRModal">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-qrcode me-2"></i>Generate QR Code
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Select Bathroom</label>
+                                <select name="bathroom" id="bathroom-select" class="form-select" required onchange="updatePreview()">
+                                    <option value="">Select a bathroom...</option>
+                                    {% for bathroom in bathrooms %}
+                                    <option value="{{ bathroom.id }}" 
+                                            data-building="{{ bathroom.building.name }}"
+                                            data-number="{{ bathroom.bathroom_number }}">
+                                        {{ bathroom.building.name }} - {{ bathroom.bathroom_number }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">Preview</h6>
+                                </div>
+                                <div class="card-body text-center">
+                                    <div id="preview-content">
+                                        <h5 id="preview-title" class="mb-3">Select a bathroom to preview</h5>
+                                        <div id="preview-qr" class="mb-3">
+                                            <i class="fas fa-qrcode fa-5x text-muted"></i>
+                                        </div>
+                                        <p id="preview-details" class="text-muted">
+                                            Preview will appear here
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="generate_qr" class="btn action-btn">Generate QR Code</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add before the closing </body> tag -->
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js"></script>
+
+<script>
+    document.getElementById('select-all').addEventListener('change', function() {
+        const checkboxes = document.getElementsByName('selected_codes');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+    });
+
+    function updatePreview() {
+        const select = document.getElementById('bathroom-select');
+        const selectedOption = select.options[select.selectedIndex];
+        
+        if (select.value) {
+            const buildingName = selectedOption.getAttribute('data-building');
+            const bathroomNumber = selectedOption.getAttribute('data-number');
+            
+            document.getElementById('preview-title').innerText = 
+                `${buildingName} - Bathroom ${bathroomNumber}`;
+            document.getElementById('preview-details').innerText = 
+                `Maintenance Request QR Code for ${buildingName} Bathroom ${bathroomNumber}`;
+            
+            // Add placeholder QR code icon with styling
+            document.getElementById('preview-qr').innerHTML = 
+                `<div class="border p-4 d-inline-block rounded bg-light">
+                    <i class="fas fa-qrcode fa-5x text-primary"></i>
+                </div>`;
+        } else {
+            // Reset preview to default state
+            document.getElementById('preview-title').innerText = 'Select a bathroom to preview';
+            document.getElementById('preview-qr').innerHTML = 
+                '<i class="fas fa-qrcode fa-5x text-muted"></i>';
+            document.getElementById('preview-details').innerText = 'Preview will appear here';
+        }
+    }
+
+    // Initialize tooltips if you're using them
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+</script>
+{% endblock %}

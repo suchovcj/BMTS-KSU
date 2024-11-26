@@ -17,5 +17,6 @@ urlpatterns = [
     path('staff/edit/<int:staff_id>/', views.edit_staff, name='edit_staff'),
     path('staff/delete/<int:staff_id>/', views.delete_staff, name='delete_staff'),
     path('facilities/', views.facilities, name='facilities'),
-    path('qr-codes/', views.qr_codes, name='qr_codes')
+    path('qr-codes/', views.qr_codes, name='qr_codes'),
+    path('print-qr-codes/', views.print_qr_codes, name='print_qr_codes')
 ]

@@ -1,5 +1,9 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+import qrcode
+from io import BytesIO
+from django.core.files.base import ContentFile
+from PIL import Image
 
 class StaffManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -86,3 +90,28 @@ class Bathroom(models.Model):
     def __str__(self):
         return f"{self.name} - {self.building.name}"
 
+class QRCode(models.Model):
+    bathroom = models.ForeignKey(Bathroom, on_delete=models.CASCADE)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    qr_code = models.ImageField(upload_to='qr_codes/', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    url = models.URLField()
+
+    def save(self, *args, **kwargs):
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(self.url)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        file_name = f'qr_code-{self.bathroom.bathroom_number}.png'
+        self.qr_code.save(file_name, ContentFile(buffer.getvalue()), save=False)
+        
+        super().save(*args, **kwargs)

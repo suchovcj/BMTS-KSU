@@ -1,0 +1,83 @@
+{% extends 'bmts/tickets_base.html' %}
+{% load static %}
+
+{% block title %}Print QR Codes{% endblock %}
+
+{% block content %}
+<style>
+    @media print {
+        .no-print {
+            display: none;
+        }
+        .qr-page {
+            page-break-after: always;
+        }
+        body {
+            background-color: white !important;
+        }
+    }
+
+    .qr-page {
+        background: white;
+        padding: 20px;
+        margin-bottom: 30px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+    }
+
+    .qr-image {
+        max-width: 300px;
+        margin: 20px auto;
+    }
+
+    .bathroom-info {
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    .instructions {
+        margin-top: 20px;
+        font-size: 1.1em;
+        color: #666;
+    }
+</style>
+
+<div class="container mt-4">
+    <div class="no-print mb-4">
+        <button onclick="window.print()" class="btn action-btn">
+            <i class="fas fa-print me-2"></i>Print QR Codes
+        </button>
+        <a href="{% url 'bmts:qr_codes' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to QR Codes
+        </a>
+    </div>
+
+    {% for qr in qr_codes %}
+    <div class="qr-page">
+        <div class="text-center">
+            <h2>{{ qr.bathroom.building.name }}</h2>
+            <h3>Bathroom {{ qr.bathroom.bathroom_number }}</h3>
+            <div class="qr-image">
+                <img src="{{ qr.qr_code.url }}" alt="QR Code" class="img-fluid">
+            </div>
+            <div class="bathroom-info">
+                <p class="mb-2">Please scan this QR code to submit a maintenance request</p>
+                <p class="text-muted">Building: {{ qr.bathroom.building.name }}<br>
+                Bathroom Number: {{ qr.bathroom.bathroom_number }}<br>
+                Floor: {{ qr.bathroom.floor }}</p>
+            </div>
+            <div class="instructions">
+                <p>1. Open your phone's camera<br>
+                   2. Point it at the QR code<br>
+                   3. Click the link that appears<br>
+                   4. Submit your maintenance request</p>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-info">
+        No QR codes selected for printing.
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

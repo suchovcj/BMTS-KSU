@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from .forms import StaffLoginForm
 from .forms import MaintenanceTicketForm
 from django.contrib import messages
-from .models import MaintenanceTicket, Staff, Building, Bathroom
+from .models import MaintenanceTicket, Staff, Building, Bathroom, QRCode
 from django.db.models import Q, Count
 from django.utils import timezone
 from django.contrib.auth import get_user_model  # Add this line
@@ -476,5 +476,36 @@ def facilities(request):
  
 @login_required
 def qr_codes(request):
-    return render(request, 'bmts/qr_codes.html')
+    bathrooms = Bathroom.objects.all().order_by('building__name', 'bathroom_number')
+    qr_codes = QRCode.objects.all().order_by('-created_at')
+
+    if request.method == 'POST':
+        if 'generate_qr' in request.POST:
+            bathroom_id = request.POST.get('bathroom')
+            bathroom = Bathroom.objects.get(id=bathroom_id)
+            title = f"Maintenance Request - {bathroom.building.name} Bathroom {bathroom.bathroom_number}"
+            url = f"https://yourdomain.com/maintenance-request/{bathroom.id}/"  # Replace with your actual URL
+            
+            QRCode.objects.create(
+                bathroom=bathroom,
+                title=title,
+                description=f"Scan to submit maintenance request for {bathroom.building.name} - {bathroom.bathroom_number}",
+                url=url
+            )
+            messages.success(request, 'QR Code generated successfully.')
+            return redirect('bmts:qr_codes')
+
+    context = {
+        'bathrooms': bathrooms,
+        'qr_codes': qr_codes,
+    }
+    return render(request, 'bmts/qr_codes.html', context)
+
+@login_required
+def print_qr_codes(request):
+    if request.method == 'POST':
+        selected_codes = request.POST.getlist('selected_codes')
+        qr_codes = QRCode.objects.filter(id__in=selected_codes)
+        return render(request, 'bmts/print_qr_codes.html', {'qr_codes': qr_codes})
+    return redirect('bmts:qr_codes')
     
