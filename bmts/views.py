@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from .forms import StaffLoginForm
 from .forms import MaintenanceTicketForm
 from django.contrib import messages
-from .models import MaintenanceTicket, Staff
+from .models import MaintenanceTicket, Staff, Building, Bathroom
 from django.db.models import Q, Count
 from django.utils import timezone
 from django.contrib.auth import get_user_model  # Add this line
@@ -358,7 +358,121 @@ def open_tickets(request):
 
 @login_required
 def facilities(request):
-     return render(request, 'bmts/facilities.html')
+    # Get initial querysets
+    buildings = Building.objects.all().order_by('name')
+    bathrooms = Bathroom.objects.all().order_by('building__name', 'floor')
+
+    # Handle search
+    search_query = request.GET.get('search', '')
+    if search_query:
+        buildings = buildings.filter(
+            Q(name__icontains=search_query) |
+            Q(building_id__icontains=search_query) |
+            Q(description__icontains=search_query)
+        )
+        bathrooms = bathrooms.filter(
+            Q(name__icontains=search_query) |
+            Q(bathroom_number__icontains=search_query) |
+            Q(building__name__icontains=search_query)
+        )
+
+    # Handle building filter
+    building_filter = request.GET.get('building_filter', '')
+    if building_filter:
+        bathrooms = bathrooms.filter(building_id=building_filter)
+
+    # Handle floor filter
+    floor_filter = request.GET.get('floor_filter', '')
+    if floor_filter:
+        bathrooms = bathrooms.filter(floor=floor_filter)
+
+    # Handle POST requests
+    if request.method == 'POST':
+        if 'add_building' in request.POST:
+            try:
+                Building.objects.create(
+                    name=request.POST.get('building_name'),
+                    description=request.POST.get('building_description'),
+                    building_id=request.POST.get('building_id'),
+                    number_of_floors=request.POST.get('number_of_floors'),
+                    number_of_bathrooms=request.POST.get('number_of_bathrooms')
+                )
+                messages.success(request, 'Building added successfully.')
+            except Exception as e:
+                messages.error(request, f'Error adding building: {str(e)}')
+            return redirect('bmts:facilities')
+
+        elif 'add_bathroom' in request.POST:
+            try:
+                building = Building.objects.get(id=request.POST.get('building'))
+                Bathroom.objects.create(
+                    name=request.POST.get('bathroom_name'),
+                    bathroom_number=request.POST.get('bathroom_number'),
+                    building=building,
+                    floor=request.POST.get('floor')
+                )
+                messages.success(request, 'Bathroom added successfully.')
+            except Exception as e:
+                messages.error(request, f'Error adding bathroom: {str(e)}')
+            return redirect('bmts:facilities')
+
+        elif 'edit_building' in request.POST:
+            try:
+                building = get_object_or_404(Building, id=request.POST.get('building_id'))
+                building.name = request.POST.get('building_name')
+                building.description = request.POST.get('building_description')
+                building.building_id = request.POST.get('building_id_number')
+                building.number_of_floors = request.POST.get('number_of_floors')
+                building.number_of_bathrooms = request.POST.get('number_of_bathrooms')
+                building.save()
+                messages.success(request, 'Building updated successfully.')
+            except Exception as e:
+                messages.error(request, f'Error updating building: {str(e)}')
+            return redirect('bmts:facilities')
+
+        elif 'edit_bathroom' in request.POST:
+            try:
+                bathroom = get_object_or_404(Bathroom, id=request.POST.get('bathroom_id'))
+                bathroom.name = request.POST.get('bathroom_name')
+                bathroom.bathroom_number = request.POST.get('bathroom_number')
+                bathroom.building_id = request.POST.get('building')
+                bathroom.floor = request.POST.get('floor')
+                bathroom.save()
+                messages.success(request, 'Bathroom updated successfully.')
+            except Exception as e:
+                messages.error(request, f'Error updating bathroom: {str(e)}')
+            return redirect('bmts:facilities')
+
+        elif 'delete_building' in request.POST:
+            try:
+                building = get_object_or_404(Building, id=request.POST.get('building_id'))
+                building.delete()
+                messages.success(request, 'Building deleted successfully.')
+            except Exception as e:
+                messages.error(request, f'Error deleting building: {str(e)}')
+            return redirect('bmts:facilities')
+
+        elif 'delete_bathroom' in request.POST:
+            try:
+                bathroom = get_object_or_404(Bathroom, id=request.POST.get('bathroom_id'))
+                bathroom.delete()
+                messages.success(request, 'Bathroom deleted successfully.')
+            except Exception as e:
+                messages.error(request, f'Error deleting bathroom: {str(e)}')
+            return redirect('bmts:facilities')
+
+    # Get unique floors for filter
+    floor_choices = bathrooms.values_list('floor', flat=True).distinct().order_by('floor')
+
+    context = {
+        'buildings': buildings,
+        'bathrooms': bathrooms,
+        'floor_choices': floor_choices,
+        'search_query': search_query,
+        'building_filter': building_filter,
+        'floor_filter': floor_filter,
+    }
+    return render(request, 'bmts/facilities.html', context)
  
 @login_required
 def qr_codes(request):

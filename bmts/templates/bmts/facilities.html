@@ -1,1 +1,445 @@
 {% extends 'bmts/tickets_base.html' %}
+{% load static %}
+
+{% block title %}BMTS - Facility Management{% endblock %}
+
+{% block content %}
+<style>
+    .facility-card {
+        background-color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .table-container {
+        background-color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .table th {
+        background-color: var(--secondary-color);
+        color: var(--primary-color);
+    }
+
+    .action-btn {
+        background-color: var(--secondary-color);
+        color: var(--primary-color);
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
+
+    .action-btn:hover {
+        background-color: var(--primary-color);
+        color: var(--secondary-color);
+    }
+
+    .delete-btn {
+        background-color: #dc3545;
+        color: white;
+    }
+
+    .delete-btn:hover {
+        background-color: #bb2d3b;
+        color: white;
+    }
+</style>
+
+<div class="container mt-4">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-building me-2"></i>Facility Management</h2>
+        <div>
+            <button class="btn action-btn me-2" data-bs-toggle="modal" data-bs-target="#addBuildingModal">
+                <i class="fas fa-plus me-2"></i>Add Building
+            </button>
+            <button class="btn action-btn" data-bs-toggle="modal" data-bs-target="#addBathroomModal">
+                <i class="fas fa-toilet me-2"></i>Add Bathroom
+            </button>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="facility-card mb-4">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="Search buildings or bathrooms..." 
+                           value="{{ search_query }}">
+                    <button class="btn action-btn" type="submit">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select name="building_filter" class="form-select" onchange="this.form.submit()">
+                    <option value="">All Buildings</option>
+                    {% for building in buildings %}
+                        <option value="{{ building.id }}" 
+                                {% if building_filter == building.id|stringformat:"s" %}selected{% endif %}>
+                            {{ building.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="floor_filter" class="form-select" onchange="this.form.submit()">
+                    <option value="">All Floors</option>
+                    {% for floor in floor_choices %}
+                        <option value="{{ floor }}" 
+                                {% if floor_filter == floor|stringformat:"s" %}selected{% endif %}>
+                            Floor {{ floor }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <a href="{% url 'bmts:facilities' %}" class="btn btn-secondary w-100">
+                    <i class="fas fa-undo"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Buildings Section -->
+    <h4 class="mb-3"><i class="fas fa-building me-2"></i>Buildings</h4>
+    <div class="row">
+        {% for building in buildings %}
+        <div class="col-md-4 mb-4">
+            <div class="facility-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <h5 class="card-title">{{ building.name }}</h5>
+                    <div>
+                        <button class="btn btn-sm action-btn me-1" 
+                            data-id="{{ building.id }}"
+                            data-name="{{ building.name }}"
+                            data-description="{{ building.description }}"
+                            data-building-id="{{ building.building_id }}"
+                            data-floors="{{ building.number_of_floors }}"
+                            data-bathrooms="{{ building.number_of_bathrooms }}"
+                            onclick="editBuilding(this)">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm delete-btn" 
+                                onclick="deleteBuilding('{{ building.id }}', '{{ building.name }}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <p class="text-muted">ID: {{ building.building_id }}</p>
+                <p>{{ building.description }}</p>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">
+                        <i class="fas fa-layer-group me-1"></i>{{ building.number_of_floors }} floors
+                    </small>
+                    <small class="text-muted">
+                        <i class="fas fa-toilet me-1"></i>{{ building.number_of_bathrooms }} bathrooms
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="facility-card text-center">
+                <p class="text-muted mb-0">No buildings found.</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Bathrooms Section -->
+    <div class="table-container mt-4">
+        <h4 class="mb-4"><i class="fas fa-toilet me-2"></i>Bathrooms List</h4>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Number</th>
+                        <th>Building</th>
+                        <th>Floor</th>
+                        <th>Date Added</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for bathroom in bathrooms %}
+                    <tr>
+                        <td>{{ bathroom.name }}</td>
+                        <td>{{ bathroom.bathroom_number }}</td>
+                        <td>{{ bathroom.building.name }}</td>
+                        <td>{{ bathroom.floor }}</td>
+                        <td>{{ bathroom.date_added|date:"M d, Y" }}</td>
+                        <td>
+                            <button class="btn btn-sm action-btn me-1"
+                                data-id="{{ bathroom.id }}"
+                                data-name="{{ bathroom.name }}"
+                                data-number="{{ bathroom.bathroom_number }}"
+                                data-building="{{ bathroom.building.id }}"
+                                data-floor="{{ bathroom.floor }}"
+                                onclick="editBathroom(this)">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm delete-btn" 
+                                    onclick="deleteBathroom('{{ bathroom.id }}', '{{ bathroom.name }}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">No bathrooms found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Building Modal -->
+<div class="modal fade" id="addBuildingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-building me-2"></i>Add New Building
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Building Name</label>
+                        <input type="text" name="building_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Building ID</label>
+                        <input type="text" name="building_id" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="building_description" class="form-control" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of Floors</label>
+                        <input type="number" name="number_of_floors" class="form-control" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of Bathrooms</label>
+                        <input type="number" name="number_of_bathrooms" class="form-control" min="1" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="add_building" class="btn action-btn">Add Building</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Building Modal -->
+<div class="modal fade" id="editBuildingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>Edit Building
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="building_id" id="edit_building_id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Building Name</label>
+                        <input type="text" name="building_name" id="edit_building_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Building ID</label>
+                        <input type="text" name="building_id_number" id="edit_building_id_number" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="building_description" id="edit_building_description" class="form-control" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of Floors</label>
+                        <input type="number" name="number_of_floors" id="edit_building_floors" class="form-control" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of Bathrooms</label>
+                        <input type="number" name="number_of_bathrooms" id="edit_building_bathrooms" class="form-control" min="1" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="edit_building" class="btn action-btn">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Bathroom Modal -->
+<div class="modal fade" id="addBathroomModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-toilet me-2"></i>Add New Bathroom
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Bathroom Name</label>
+                        <input type="text" name="bathroom_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Bathroom Number</label>
+                        <input type="text" name="bathroom_number" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Building</label>
+                        <select name="building" class="form-select" required>
+                            {% for building in buildings %}
+                            <option value="{{ building.id }}">{{ building.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Floor</label>
+                        <input type="number" name="floor" class="form-control" min="1" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="add_bathroom" class="btn action-btn">Add Bathroom</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Bathroom Modal -->
+<div class="modal fade" id="editBathroomModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>Edit Bathroom
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="bathroom_id" id="edit_bathroom_id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Bathroom Name</label>
+                        <input type="text" name="bathroom_name" id="edit_bathroom_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Bathroom Number</label>
+                        <input type="text" name="bathroom_number" id="edit_bathroom_number" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Building</label>
+                        <select name="building" id="edit_bathroom_building" class="form-select" required>
+                            {% for building in buildings %}
+                            <option value="{{ building.id }}">{{ building.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Floor</label>
+                        <input type="number" name="floor" id="edit_bathroom_floor" class="form-control" min="1" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="edit_bathroom" class="btn action-btn">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Forms -->
+<form id="deleteBuildingForm" method="post" style="display: none;">
+    {% csrf_token %}
+    <input type="hidden" name="building_id" id="delete_building_id">
+    <input type="hidden" name="delete_building" value="true">
+</form>
+
+<form id="deleteBathroomForm" method="post" style="display: none;">
+    {% csrf_token %}
+    <input type="hidden" name="bathroom_id" id="delete_bathroom_id">
+    <input type="hidden" name="delete_bathroom" value="true">
+</form>
+
+<!-- JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js"></script>
+<script>
+    function editBuilding(element) {
+        const data = element.dataset;
+        document.getElementById('edit_building_id').value = data.id;
+        document.getElementById('edit_building_name').value = data.name;
+        document.getElementById('edit_building_id_number').value = data.buildingId;
+        document.getElementById('edit_building_description').value = data.description;
+        document.getElementById('edit_building_floors').value = data.floors;
+        document.getElementById('edit_building_bathrooms').value = data.bathrooms;
+        new bootstrap.Modal(document.getElementById('editBuildingModal')).show();
+    }
+
+    function editBathroom(element) {
+        const data = element.dataset;
+        document.getElementById('edit_bathroom_id').value = data.id;
+        document.getElementById('edit_bathroom_name').value = data.name;
+        document.getElementById('edit_bathroom_number').value = data.number;
+        document.getElementById('edit_bathroom_building').value = data.building;
+        document.getElementById('edit_bathroom_floor').value = data.floor;
+        new bootstrap.Modal(document.getElementById('editBathroomModal')).show();
+    }
+
+    function deleteBuilding(id, name) {
+        if (confirm(`Are you sure you want to delete building "${name}"? This will also delete all associated bathrooms.`)) {
+            document.getElementById('delete_building_id').value = id;
+            document.getElementById('deleteBuildingForm').submit();
+        }
+    }
+
+    function deleteBathroom(id, name) {
+        if (confirm(`Are you sure you want to delete bathroom "${name}"?`)) {
+            document.getElementById('delete_bathroom_id').value = id;
+            document.getElementById('deleteBathroomForm').submit();
+        }
+    }
+</script>
+{% endblock %}

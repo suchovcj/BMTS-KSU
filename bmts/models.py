@@ -64,4 +64,25 @@ class MaintenanceTicket(models.Model):
 
     def __str__(self):
         return f"Ticket {self.ticket_number} - {self.bathroom_number}"
+    
+class Building(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField()
+    building_id = models.CharField(max_length=50, unique=True)
+    number_of_floors = models.IntegerField()
+    number_of_bathrooms = models.IntegerField()
+    date_added = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+class Bathroom(models.Model):
+    name = models.CharField(max_length=100)
+    bathroom_number = models.CharField(max_length=50)
+    building = models.ForeignKey(Building, on_delete=models.CASCADE)
+    floor = models.IntegerField()
+    date_added = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.building.name}"
 
