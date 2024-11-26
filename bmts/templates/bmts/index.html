@@ -174,19 +174,25 @@
                     <h5 class="mb-3">Quick Actions</h5>
                     <div class="d-grid gap-2">
                         <a href="{% url 'bmts:open_tickets' %}" class="btn quick-action mb-2">
-                            <i class="fas fa-plus me-2"></i>Open Tickets
+                            <i class="fas fa-exclamation-circle me-2"></i>Open Tickets
                         </a>
                         <a href="{% url 'bmts:closed_tickets' %}" class="btn quick-action mb-2">
-                            <i class="fas fa-user-plus me-2"></i>Closed Tickets
+                            <i class="fas fa-check-circle me-2"></i>Closed Tickets
                         </a>
                         <a href="{% url 'bmts:staff' %}" class="btn quick-action mb-2">
-                            <i class="fas fa-file-alt me-2"></i>Staff
+                            <i class="fas fa-users me-2"></i>Staff
                         </a>
-                        <a href="{% url 'bmts:reports' %}" class="btn quick-action">
-                            <i class="fas fa-cog me-2"></i>Reports
+                        <a href="{% url 'bmts:reports' %}" class="btn quick-action mb-2">
+                            <i class="fas fa-chart-bar me-2"></i>Reports
+                        </a>
+                        <a href="{% url 'bmts:facilities' %}" class="btn quick-action">
+                            <i class="fas fa-toilet me-2"></i>Facility Management
+                        </a>
+                        <a href="{% url 'bmts:qr_codes' %}" class="btn quick-action">
+                            <i class="fas fa-qrcode me-2"></i>QR Codes
                         </a>
                         <a href="{% url 'bmts:map' %}" class="btn quick-action">
-                            <i class="fas fa-cog me-2"></i>Interactive Map
+                            <i class="fas fa-map me-2"></i>Interactive Map
                         </a>
                     </div>
                 </div>
@@ -227,32 +233,10 @@
                         </div>
                         {% endfor %}
                     </div>
-                    <div class="text-end mt-3">
-                        <a href="{% url 'bmts:open_tickets' %}" class="btn quick-action">
-                            <i class="fas fa-list me-2"></i>View All Tickets
-                        </a>
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="chart-container">
-                            <h5>Upcoming Deadlines</h5>
-                            <ul class="list-unstyled">
-                                <li class="mb-2"><i class="fas fa-calendar-alt me-2 text-primary"></i>Project Review - Tomorrow</li>
-                                <li class="mb-2"><i class="fas fa-calendar-alt me-2 text-warning"></i>Team Meeting - Next Week</li>
-                                <li><i class="fas fa-calendar-alt me-2 text-danger"></i>Project Deadline - In 2 Weeks</li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="chart-container">
-                            <h5>Team Performance</h5>
-                            <ul class="list-unstyled">
-                                <li class="mb-2"><i class="fas fa-star me-2 text-warning"></i>Team A - 95% Efficiency</li>
-                                <li class="mb-2"><i class="fas fa-star me-2 text-warning"></i>Team B - 87% Efficiency</li>
-                                <li><i class="fas fa-star me-2 text-warning"></i>Team C - 92% Efficiency</li>
-                            </ul>
+                        <div class="text-end mt-3">
+                            <a href="{% url 'bmts:open_tickets' %}" class="btn quick-action">
+                                <i class="fas fa-list me-2"></i>View All Tickets
+                            </a>
                         </div>
                     </div>
                 </div>

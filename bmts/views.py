@@ -355,3 +355,12 @@ def open_tickets(request):
 
     tickets = MaintenanceTicket.objects.filter(status='Open').order_by('-date_submitted')
     return render(request, 'bmts/open_tickets.html', {'tickets': tickets})
+
+@login_required
+def facilities(request):
+     return render(request, 'bmts/facilities.html')
+ 
+@login_required
+def qr_codes(request):
+    return render(request, 'bmts/qr_codes.html')
+    

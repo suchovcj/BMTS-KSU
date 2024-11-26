@@ -16,4 +16,6 @@ urlpatterns = [
     path('staff/add/', views.add_staff, name='add_staff'),  # For adding new staff
     path('staff/edit/<int:staff_id>/', views.edit_staff, name='edit_staff'),
     path('staff/delete/<int:staff_id>/', views.delete_staff, name='delete_staff'),
+    path('facilities/', views.facilities, name='facilities'),
+    path('qr-codes/', views.qr_codes, name='qr_codes')
 ]
