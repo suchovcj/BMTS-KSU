@@ -50,6 +50,13 @@ class MaintenanceTicket(models.Model):
     date_closed = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Open')
     ticket_number = models.CharField(max_length=10, unique=True, blank=True)
+    closed_by = models.ForeignKey(
+        Staff,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='closed_tickets'
+    )
 
     def save(self, *args, **kwargs):
         if not self.ticket_number:

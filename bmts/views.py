@@ -331,18 +331,20 @@ def logout_view(request):
     logout(request)
     return redirect('bmts:login')
 
-@login_required
+# views.py
 def create_ticket(request):
     if request.method == 'POST':
-        form = MaintenanceTicketForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Maintenance ticket submitted successfully!')
-            return redirect('bmts:index')  # or wherever you want to redirect after submission
-    else:
-        form = MaintenanceTicketForm()
-    
-    return render(request, 'bmts/create_ticket.html', {'form': form})
+        try:
+            MaintenanceTicket.objects.create(
+                bathroom_number=request.POST.get('bathroom-number'),
+                email=request.POST.get('email'),
+                description=request.POST.get('description'),
+                status='Open'
+            )
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
+    return render(request, 'bmts/create_ticket.html')
 
 @login_required
 def open_tickets(request):
@@ -351,7 +353,8 @@ def open_tickets(request):
         if ticket_ids:
             MaintenanceTicket.objects.filter(id__in=ticket_ids).update(
                 status='Closed',
-                date_closed=timezone.now()
+                date_closed=timezone.now(),
+                closed_by=request.user
             )
             messages.success(request, f'{len(ticket_ids)} ticket(s) marked as closed.')
         return redirect('bmts:open_tickets')

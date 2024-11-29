@@ -47,6 +47,7 @@
                 <th>Description</th>
                 <th>Date Submitted</th>
                 <th>Date Closed</th>
+                <th>Closed By</th>
             </tr>
         </thead>
         <tbody>
@@ -58,6 +59,7 @@
                 <td>{{ ticket.description }}</td>
                 <td>{{ ticket.date_submitted|date:"M d, Y H:i" }}</td>
                 <td>{{ ticket.date_closed|date:"M d, Y H:i" }}</td>
+                <td>{{ ticket.closed_by.first_name }} {{ ticket.closed_by.last_name }}</td>
             </tr>
             {% empty %}
             <tr>
