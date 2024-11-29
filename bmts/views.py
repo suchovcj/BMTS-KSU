@@ -12,6 +12,9 @@ from django.http import JsonResponse
 from datetime import datetime, timedelta
 from django.contrib.sessions.models import Session
 from django.utils import timezone
+from django.core.files.base import ContentFile
+import qrcode
+from io import BytesIO
 
 Staff = get_user_model()  # This gets your custom Staff model
 
@@ -481,25 +484,42 @@ def qr_codes(request):
 
     if request.method == 'POST':
         if 'generate_qr' in request.POST:
-            bathroom_id = request.POST.get('bathroom')
-            bathroom = Bathroom.objects.get(id=bathroom_id)
-            title = f"Maintenance Request - {bathroom.building.name} Bathroom {bathroom.bathroom_number}"
-            url = f"https://yourdomain.com/maintenance-request/{bathroom.id}/"  # Replace with your actual URL
-            
-            QRCode.objects.create(
-                bathroom=bathroom,
-                title=title,
-                description=f"Scan to submit maintenance request for {bathroom.building.name} - {bathroom.bathroom_number}",
-                url=url
-            )
-            messages.success(request, 'QR Code generated successfully.')
+            try:
+                bathroom_id = request.POST.get('bathroom')
+                bathroom = Bathroom.objects.get(id=bathroom_id)
+                base_url = request.build_absolute_uri('/').rstrip('/')
+                qr_url = f"{base_url}/maintenance-request/{bathroom.id}/"
+                
+                # Generate QR code image
+                qr = qrcode.QRCode(version=1, box_size=10, border=4)
+                qr.add_data(qr_url)
+                qr.make(fit=True)
+                img = qr.make_image(fill_color="black", back_color="white")
+                
+                # Save to BytesIO
+                buffer = BytesIO()
+                img.save(buffer, format='PNG')
+                
+                # Create QR code object
+                qr_code = QRCode(
+                    bathroom=bathroom,
+                    title=f"Maintenance Request - {bathroom.building.name} Bathroom {bathroom.bathroom_number}",
+                    description=f"Scan for maintenance request - {bathroom.building.name} - {bathroom.bathroom_number}",
+                    url=qr_url
+                )
+                
+                # Save file
+                file_name = f'qr-{bathroom.building.name}-{bathroom.bathroom_number}.png'
+                qr_code.qr_code.save(file_name, ContentFile(buffer.getvalue()), save=True)
+                messages.success(request, 'QR Code generated successfully.')
+            except Exception as e:
+                messages.error(request, f'Error generating QR code: {str(e)}')
             return redirect('bmts:qr_codes')
 
-    context = {
+    return render(request, 'bmts/qr_codes.html', {
         'bathrooms': bathrooms,
-        'qr_codes': qr_codes,
-    }
-    return render(request, 'bmts/qr_codes.html', context)
+        'qr_codes': qr_codes
+    })
 
 @login_required
 def print_qr_codes(request):
