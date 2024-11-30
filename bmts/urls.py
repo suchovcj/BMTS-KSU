@@ -20,5 +20,6 @@ urlpatterns = [
     path('qr-codes/', views.qr_codes, name='qr_codes'),
     path('print-qr-codes/', views.print_qr_codes, name='print_qr_codes'),
     path('export-csv/', views.export_csv, name='export_csv'),
-    path('export-pdf/', views.export_pdf, name='export_pdf')
+    path('export-pdf/', views.export_pdf, name='export_pdf'),
+    path('staff-dashboard/', views.staff_dashboard, name='staff_dashboard')
 ]

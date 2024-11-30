@@ -165,6 +165,9 @@ def delete_staff(request, staff_id):
 
 @login_required
 def index(request):
+    # If user is not admin, redirect to staff dashboard
+    if not request.user.is_superuser:
+        return redirect('bmts:staff_dashboard')
     # Get date ranges
     today = timezone.now().date()
     today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
@@ -331,7 +334,11 @@ def login_view(request):
             user = authenticate(request, username=email, password=password)
             if user is not None:
                 login(request, user)
-                return redirect('bmts:index')
+                # Redirect based on user role
+                if user.is_superuser:
+                    return redirect('bmts:index')
+                else:
+                    return redirect('bmts:staff_dashboard')
     else:
         form = StaffLoginForm()
     return render(request, 'bmts/login.html', {'form': form})
@@ -774,4 +781,22 @@ def export_pdf(request):
     
     doc.build(elements)
     return response
+
+@login_required
+def staff_dashboard(request):
+    # Get basic stats for staff
+    pending_tickets_count = MaintenanceTicket.objects.filter(status='Open').count()
+    recent_tickets = MaintenanceTicket.objects.all().order_by('-date_submitted')[:5]
+    today = timezone.now().date()
+    today_closed_count = MaintenanceTicket.objects.filter(
+        status='Closed',
+        date_closed__date=today
+    ).count()
+
+    context = {
+        'pending_tickets_count': pending_tickets_count,
+        'recent_tickets': recent_tickets,
+        'today_closed_count': today_closed_count,
+    }
+    return render(request, 'bmts/staff_dashboard.html', context)
     
