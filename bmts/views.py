@@ -15,6 +15,8 @@ from django.utils import timezone
 from django.core.files.base import ContentFile
 import qrcode
 from io import BytesIO
+from django.db.models import Count
+from django.db.models.functions import TruncDate
 
 Staff = get_user_model()  # This gets your custom Staff model
 
@@ -531,4 +533,60 @@ def print_qr_codes(request):
         qr_codes = QRCode.objects.filter(id__in=selected_codes)
         return render(request, 'bmts/print_qr_codes.html', {'qr_codes': qr_codes})
     return redirect('bmts:qr_codes')
+
+
+@login_required
+def reports(request):
+    import json
+
+    # Get date range filters
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    # Base queryset
+    tickets_qs = MaintenanceTicket.objects.all()
+    
+    if start_date:
+        tickets_qs = tickets_qs.filter(date_submitted__gte=start_date)
+    if end_date:
+        tickets_qs = tickets_qs.filter(date_submitted__lte=end_date)
+
+    # Staff Performance Report
+    staff_performance = (
+        MaintenanceTicket.objects
+        .filter(status='Closed')
+        .values('closed_by__first_name', 'closed_by__last_name')
+        .annotate(tickets_closed=Count('id'))
+        .order_by('-tickets_closed')
+    )
+
+    # Bathroom Activity Report (modified to use bathroom_number)
+    bathroom_activity = (
+        MaintenanceTicket.objects
+        .values('bathroom_number')
+        .annotate(total_tickets=Count('id'))
+        .order_by('-total_tickets')
+    )
+
+    # Status Distribution
+    status_distribution = (
+        MaintenanceTicket.objects
+        .values('status')
+        .annotate(count=Count('id'))
+    )
+
+    # Convert querysets to lists for JSON serialization
+    staff_performance_data = list(staff_performance)
+    bathroom_activity_data = list(bathroom_activity)
+    status_distribution_data = list(status_distribution)
+
+    context = {
+        'staff_performance': staff_performance,
+        'bathroom_activity': bathroom_activity,
+        'status_distribution': status_distribution,
+        'staff_performance_json': json.dumps(staff_performance_data),
+        'bathroom_activity_json': json.dumps(bathroom_activity_data),
+        'status_distribution_json': json.dumps(status_distribution_data),
+    }
+    return render(request, 'bmts/reports.html', context)
     
