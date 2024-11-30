@@ -1,6 +1,6 @@
 {% extends 'bmts/tickets_base.html' %}
 {% load static %}
-
+{% load custom_filters %}
 {% block title %}BMTS - Reports{% endblock %}
 
 {% block content %}
@@ -35,15 +35,17 @@
     }
 </style>
 
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-chart-bar me-2"></i>Reports & Analytics</h2>
-        <div>
-            <button class="btn action-btn" onclick="window.print()">
-                <i class="fas fa-print me-2"></i>Print Report
-            </button>
-        </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-chart-bar me-2"></i>Reports & Analytics</h2>
+    <div>
+        <a href="{% url 'bmts:export_csv' %}" class="btn action-btn me-2">
+            <i class="fas fa-file-csv me-2"></i>Export CSV
+        </a>
+        <a href="{% url 'bmts:export_pdf' %}" class="btn action-btn">
+            <i class="fas fa-file-pdf me-2"></i>Export PDF
+        </a>
     </div>
+</div>
 
     <!-- Date Range Filter -->
     <div class="report-card">
@@ -65,6 +67,63 @@
             </div>
         </form>
     </div>
+
+    <!-- Summary Cards Row -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="report-card">
+            <h6 class="text-muted mb-2">Total Tickets Submitted</h6>
+            <h3>{{ total_tickets_count }}</h3>
+            <small class="text-success">
+                <i class="fas fa-ticket-alt me-1"></i>All Time
+            </small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="report-card">
+            <h6 class="text-muted mb-2">Average Resolution Time</h6>
+            <h3>{{ avg_resolution_time }}</h3>
+            <small class="text-primary">
+                <i class="fas fa-clock me-1"></i>Per Ticket
+            </small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="report-card">
+            <h6 class="text-muted mb-2">Resolution Rate</h6>
+            <h3>{{ resolution_rate|floatformat:1 }}%</h3>
+            <small class="text-warning">
+                <i class="fas fa-percentage me-1"></i>Tickets Closed/Total
+            </small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="report-card">
+            <h6 class="text-muted mb-2">Tickets This Week</h6>
+            <h3>{{ tickets_this_week }}</h3>
+            <small class="text-{% if tickets_week_change > 0 %}success{% else %}danger{% endif %}">
+                <i class="fas fa-arrow-{% if tickets_week_change > 0 %}up{% else %}down{% endif %} me-1"></i>
+                {{ tickets_week_change|absolute }}% vs last week
+            </small>
+        </div>
+    </div>
+</div>
+
+<!-- Additional Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="report-card">
+            <h5 class="mb-3">Daily Submission Trend</h5>
+            <div class="chart-container" id="dailyTrendChart"></div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="report-card">
+            <h5 class="mb-3">Resolution Time Distribution</h5>
+            <div class="chart-container" id="resolutionTimeChart"></div>
+        </div>
+    </div>
+</div>
 
     <!-- Staff Performance Report -->
     <div class="report-card">
@@ -123,26 +182,89 @@
     </div>
 
     <!-- Status Distribution -->
-    <div class="report-card">
-        <h4 class="mb-4">Ticket Status Distribution</h4>
-        <div class="chart-container" id="statusChart"></div>
+    <div class="chart-container">
+        <h5 class="mb-4">Ticket Status Distribution</h5>
+        <div id="statusChart" style="height: 300px;"></div>
     </div>
 </div>
+<!-- Add this right before your chart scripts -->
 <div id="chartsData" 
-     data-staff='{{ staff_performance_json|safe }}' 
+     data-daily-trend='{{ daily_trend_json|safe }}' 
+     data-resolution-dist='{{ resolution_distribution_json|safe }}'
+     data-staff='{{ staff_performance_json|safe }}'
      data-bathrooms='{{ bathroom_activity_json|safe }}'
-     data-status='{{ status_distribution_json|safe }}'>
+     data-status='{{ status_data_json|safe }}'>
 </div>
 
 <!-- Charts Script -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Get data from hidden element
         const chartsData = document.getElementById('chartsData');
+        const dailyTrendData = JSON.parse(chartsData.dataset.dailyTrend);
+        const resolutionDistData = JSON.parse(chartsData.dataset.resolutionDist);
         const staffData = JSON.parse(chartsData.dataset.staff);
         const bathroomData = JSON.parse(chartsData.dataset.bathrooms);
+        
+        // Status Distribution Chart
+        const statusChart = echarts.init(document.getElementById('statusChart'));
         const statusData = JSON.parse(chartsData.dataset.status);
+        
+        statusChart.setOption({
+            tooltip: {
+                trigger: 'item'
+            },
+            series: [{
+                type: 'pie',
+                radius: ['40%', '70%'],
+                data: statusData.map(item => ({
+                    name: item.name,
+                    value: item.value,
+                    itemStyle: {
+                        color: item.name === 'Open' ? '#ffcc00' : '#003366'
+                    }
+                }))
+            }]
+        });
+
+        // Daily Trend Chart
+        const dailyTrendChart = echarts.init(document.getElementById('dailyTrendChart'));
+        dailyTrendChart.setOption({
+            tooltip: {
+                trigger: 'axis'
+            },
+            xAxis: {
+                type: 'category',
+                data: dailyTrendData.map(item => new Date(item.date).toLocaleDateString())
+            },
+            yAxis: {
+                type: 'value'
+            },
+            series: [{
+                data: dailyTrendData.map(item => item.count),
+                type: 'line',
+                smooth: true,
+                color: '#003366',
+                areaStyle: {
+                    opacity: 0.3
+                }
+            }]
+        });
+
+        // Resolution Time Distribution Chart
+        const resolutionTimeChart = echarts.init(document.getElementById('resolutionTimeChart'));
+        resolutionTimeChart.setOption({
+            tooltip: {
+                trigger: 'item'
+            },
+            series: [{
+                type: 'pie',
+                radius: ['40%', '70%'],
+                data: resolutionDistData
+            }]
+        });
 
         // Staff Performance Chart
         const staffChart = echarts.init(document.getElementById('staffChart'));
@@ -184,27 +306,10 @@
             }]
         });
 
-        // Status Distribution Chart
-        const statusChart = echarts.init(document.getElementById('statusChart'));
-        statusChart.setOption({
-            tooltip: {
-                trigger: 'item'
-            },
-            series: [{
-                type: 'pie',
-                radius: ['40%', '70%'],
-                data: statusData.map(item => ({
-                    value: item.count,
-                    name: item.status,
-                    itemStyle: {
-                        color: item.status === 'Open' ? '#ffcc00' : '#003366'
-                    }
-                }))
-            }]
-        });
-
         // Handle window resize
         window.addEventListener('resize', function() {
+            dailyTrendChart.resize();
+            resolutionTimeChart.resize();
             staffChart.resize();
             bathroomChart.resize();
             statusChart.resize();

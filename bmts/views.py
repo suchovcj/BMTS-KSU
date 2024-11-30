@@ -5,7 +5,7 @@ from .forms import StaffLoginForm
 from .forms import MaintenanceTicketForm
 from django.contrib import messages
 from .models import MaintenanceTicket, Staff, Building, Bathroom, QRCode
-from django.db.models import Q, Count
+from django.db.models import F, Q, Count
 from django.utils import timezone
 from django.contrib.auth import get_user_model  # Add this line
 from django.http import JsonResponse
@@ -17,6 +17,13 @@ import qrcode
 from io import BytesIO
 from django.db.models import Count
 from django.db.models.functions import TruncDate
+import csv
+from django.http import HttpResponse
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+import json
 
 Staff = get_user_model()  # This gets your custom Staff model
 
@@ -537,19 +544,48 @@ def print_qr_codes(request):
 
 @login_required
 def reports(request):
-    import json
+    # Basic counts and initial data
+    total_tickets_count = MaintenanceTicket.objects.count()
+    closed_tickets = MaintenanceTicket.objects.filter(
+        status='Closed',
+        date_closed__isnull=False
+    )
 
-    # Get date range filters
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
+    # Average resolution time calculation
+    avg_resolution_display = "N/A"
+    if closed_tickets.exists():
+        total_resolution_time = timedelta(0)
+        for ticket in closed_tickets:
+            resolution_time = ticket.date_closed - ticket.date_submitted
+            total_resolution_time += resolution_time
+        avg_resolution_time = total_resolution_time / closed_tickets.count()
+        avg_resolution_hours = avg_resolution_time.total_seconds() / 3600
+        
+        if avg_resolution_hours >= 24:
+            avg_resolution_display = f"{int(avg_resolution_hours/24)}d {int(avg_resolution_hours%24)}h"
+        else:
+            avg_resolution_display = f"{int(avg_resolution_hours)}h"
 
-    # Base queryset
-    tickets_qs = MaintenanceTicket.objects.all()
+    # Resolution rate
+    resolution_rate = (closed_tickets.count() / total_tickets_count * 100) if total_tickets_count > 0 else 0
+
+    # Weekly comparison
+    this_week = timezone.now().date() - timedelta(days=7)
+    last_week = this_week - timedelta(days=7)
     
-    if start_date:
-        tickets_qs = tickets_qs.filter(date_submitted__gte=start_date)
-    if end_date:
-        tickets_qs = tickets_qs.filter(date_submitted__lte=end_date)
+    tickets_this_week = MaintenanceTicket.objects.filter(
+        date_submitted__gte=this_week
+    ).count()
+    
+    tickets_last_week = MaintenanceTicket.objects.filter(
+        date_submitted__gte=last_week,
+        date_submitted__lt=this_week
+    ).count()
+    
+    tickets_week_change = (
+        ((tickets_this_week - tickets_last_week) / tickets_last_week * 100)
+        if tickets_last_week > 0 else 0
+    )
 
     # Staff Performance Report
     staff_performance = (
@@ -560,7 +596,7 @@ def reports(request):
         .order_by('-tickets_closed')
     )
 
-    # Bathroom Activity Report (modified to use bathroom_number)
+    # Bathroom Activity Report
     bathroom_activity = (
         MaintenanceTicket.objects
         .values('bathroom_number')
@@ -568,25 +604,174 @@ def reports(request):
         .order_by('-total_tickets')
     )
 
-    # Status Distribution
-    status_distribution = (
+    # Daily trend data (last 14 days)
+    daily_trend = (
         MaintenanceTicket.objects
-        .values('status')
+        .filter(date_submitted__gte=timezone.now() - timedelta(days=14))
+        .annotate(date=TruncDate('date_submitted'))
+        .values('date')
         .annotate(count=Count('id'))
+        .order_by('date')
     )
 
-    # Convert querysets to lists for JSON serialization
-    staff_performance_data = list(staff_performance)
-    bathroom_activity_data = list(bathroom_activity)
-    status_distribution_data = list(status_distribution)
+    # Convert dates to strings for JSON serialization
+    daily_trend_data = [
+        {
+            'date': item['date'].strftime('%Y-%m-%d'),
+            'count': item['count']
+        } for item in daily_trend
+    ]
 
+    # Resolution time distribution
+    resolution_distribution = {
+        '< 1 day': closed_tickets.filter(date_closed__lt=F('date_submitted') + timedelta(days=1)).count(),
+        '1-2 days': closed_tickets.filter(
+            date_closed__gte=F('date_submitted') + timedelta(days=1),
+            date_closed__lt=F('date_submitted') + timedelta(days=2)
+        ).count(),
+        '2-3 days': closed_tickets.filter(
+            date_closed__gte=F('date_submitted') + timedelta(days=2),
+            date_closed__lt=F('date_submitted') + timedelta(days=3)
+        ).count(),
+        '3+ days': closed_tickets.filter(
+            date_closed__gte=F('date_submitted') + timedelta(days=3)
+        ).count()
+    }
+    
+    status_counts = {
+        'Open': MaintenanceTicket.objects.filter(status='Open').count(),
+        'Closed': MaintenanceTicket.objects.filter(status='Closed').count()
+    }
+
+    status_data = [
+        {'name': status, 'value': count}
+        for status, count in status_counts.items()
+    ]
+
+    # Prepare the context
     context = {
         'staff_performance': staff_performance,
         'bathroom_activity': bathroom_activity,
-        'status_distribution': status_distribution,
-        'staff_performance_json': json.dumps(staff_performance_data),
-        'bathroom_activity_json': json.dumps(bathroom_activity_data),
-        'status_distribution_json': json.dumps(status_distribution_data),
+        'total_tickets_count': total_tickets_count,
+        'avg_resolution_time': avg_resolution_display,
+        'resolution_rate': resolution_rate,
+        'tickets_this_week': tickets_this_week,
+        'tickets_week_change': tickets_week_change,
+        'daily_trend_json': json.dumps(daily_trend_data),
+        'resolution_distribution_json': json.dumps([
+            {'name': k, 'value': v} for k, v in resolution_distribution.items()
+        ]),
+        'staff_performance_json': json.dumps(list(staff_performance)),
+        'bathroom_activity_json': json.dumps(list(bathroom_activity)),
+        'status_data_json': json.dumps(status_data)
     }
+
     return render(request, 'bmts/reports.html', context)
+
+@login_required
+def export_csv(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="bmts_report.csv"'
+
+    writer = csv.writer(response)
+    
+    # Write Staff Performance
+    writer.writerow(['Staff Performance Report'])
+    writer.writerow(['Staff Member', 'Tickets Closed'])
+    staff_performance = (
+        MaintenanceTicket.objects
+        .filter(status='Closed')
+        .values('closed_by__first_name', 'closed_by__last_name')
+        .annotate(tickets_closed=Count('id'))
+    )
+    for staff in staff_performance:
+        writer.writerow([
+            f"{staff['closed_by__first_name']} {staff['closed_by__last_name']}",
+            staff['tickets_closed']
+        ])
+    
+    writer.writerow([])  # Empty row for spacing
+    
+    # Write Bathroom Activity
+    writer.writerow(['Bathroom Activity Report'])
+    writer.writerow(['Bathroom Number', 'Total Tickets'])
+    bathroom_activity = (
+        MaintenanceTicket.objects
+        .values('bathroom_number')
+        .annotate(total_tickets=Count('id'))
+    )
+    for bathroom in bathroom_activity:
+        writer.writerow([
+            bathroom['bathroom_number'],
+            bathroom['total_tickets']
+        ])
+
+    return response
+
+@login_required
+def export_pdf(request):
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="bmts_report.pdf"'
+    
+    # Create PDF document
+    doc = SimpleDocTemplate(response, pagesize=letter)
+    elements = []
+
+    # Staff Performance Data
+    staff_performance = (
+        MaintenanceTicket.objects
+        .filter(status='Closed')
+        .values('closed_by__first_name', 'closed_by__last_name')
+        .annotate(tickets_closed=Count('id'))
+    )
+    
+    staff_data = [['Staff Member', 'Tickets Closed']]
+    for staff in staff_performance:
+        staff_data.append([
+            f"{staff['closed_by__first_name']} {staff['closed_by__last_name']}",
+            str(staff['tickets_closed'])
+        ])
+
+    # Bathroom Activity Data
+    bathroom_activity = (
+        MaintenanceTicket.objects
+        .values('bathroom_number')
+        .annotate(total_tickets=Count('id'))
+    )
+    
+    bathroom_data = [['Bathroom Number', 'Total Tickets']]
+    for bathroom in bathroom_activity:
+        bathroom_data.append([
+            bathroom['bathroom_number'],
+            str(bathroom['total_tickets'])
+        ])
+
+    # Create and style tables
+    staff_table = Table(staff_data)
+    staff_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 14),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    bathroom_table = Table(bathroom_data)
+    bathroom_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 14),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+
+    elements.append(staff_table)
+    elements.append(bathroom_table)
+    
+    doc.build(elements)
+    return response
     
